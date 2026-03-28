@@ -1,24 +1,13 @@
-<!DOCTYPE html>
-<html>
-<body>
-
-<script>
-fetch("https://aquaquece-by-indiverswater.personal.70815.workers.dev/")
-  .then(async res => {
-    const text = await res.text();
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error(text);
-    }
-  })
-  .then(data => {
-    document.body.innerHTML = "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
-  })
-  .catch(err => {
-    document.body.innerHTML = "<pre style='color:red'>" + err + "</pre>";
-  });
-</script>
-
-</body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
+

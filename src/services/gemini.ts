@@ -26,25 +26,24 @@ CAPABILITIES:
 `;
 
 export const getGeminiPro = () => {
-  const ai = new GoogleGenAI({ apiKey: "AIzaSyBUzPtI1oBJdbgpF6ZSlgDZ-akn1IKjwKE", httpOptions: { apiVersion: "v1" } });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   return ai.models.generateContent({
-    model: "models/gemini-1.5-flash",
+    model: "gemini-3.1-pro-preview",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
-      systemInstructions: SYSTEM_INSTRUCTION,
+      systemInstruction: SYSTEM_INSTRUCTION,
     },
   });
 };
 
 export const createChat = () => {
-  const ai = new GoogleGenAI({ apiKey: "AIzaSyBUzPtI1oBJdbgpF6ZSlgDZ-akn1IKjwKE", httpOptions: { apiVersion: "v1" } });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   return ai.chats.create({
-    model: "models/gemini-1.5-flash",
+    model: "gemini-3.1-pro-preview",
     config: {
-  systemInstructions: SYSTEM_INSTRUCTION,
-},
+      systemInstruction: SYSTEM_INSTRUCTION,
+    },
   });
 };
 
 export { SYSTEM_INSTRUCTION };
-// Version 2.0 - Forced Update
