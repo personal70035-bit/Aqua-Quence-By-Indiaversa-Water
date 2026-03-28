@@ -1,13 +1,9 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-
+<script>
+fetch("https://aquaquence-by-indiversawater.personal-70035.workers.dev/")
+  .then(res => res.json())
+  .then(data => {
+    console.log(data);
+    document.body.innerHTML += "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+  })
+  .catch(err => console.error(err));
+</script>
