@@ -39,7 +39,7 @@ export const getGeminiPro = () => {
 export const createChat = () => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
   return ai.chats.create({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-1.5-flash"
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
     },
