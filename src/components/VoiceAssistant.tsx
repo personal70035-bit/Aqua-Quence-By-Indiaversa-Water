@@ -25,10 +25,14 @@ export const VoiceAssistant: React.FC = () => {
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<Int16Array[]>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const isPlayingRef = useRef(false);
 
   const startCall = async () => {
     setIsConnecting(true);
+    let currentTurnText = '';
+    let currentMessageId: number | null = null;
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
       
@@ -48,31 +52,53 @@ export const VoiceAssistant: React.FC = () => {
             startAudioCapture();
           },
           onmessage: async (message: LiveServerMessage) => {
-            if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-              const base64Audio = message.serverContent.modelTurn.parts[0].inlineData.data;
-              const audioData = base64ToUint8Array(base64Audio);
-              const pcmData = new Int16Array(audioData.buffer);
-              audioQueueRef.current.push(pcmData);
-              if (!isPlayingRef.current) {
-                playNextInQueue();
+            // Handle audio output
+            if (message.serverContent?.modelTurn?.parts) {
+              for (const part of message.serverContent.modelTurn.parts) {
+                if (part.inlineData?.data) {
+                  const base64Audio = part.inlineData.data;
+                  const audioData = base64ToUint8Array(base64Audio);
+                  const pcmData = new Int16Array(audioData.buffer);
+                  audioQueueRef.current.push(pcmData);
+                  if (!isPlayingRef.current) {
+                    setIsSpeaking(true);
+                    playNextInQueue();
+                  }
+                }
+
+                if (part.text) {
+                  currentTurnText += part.text;
+                  
+                  if (currentMessageId === null) {
+                    currentMessageId = await db.messages.add({
+                      sessionId,
+                      role: 'model',
+                      content: currentTurnText,
+                      timestamp: Date.now(),
+                      type: 'voice'
+                    }) as number;
+                  } else {
+                    await db.messages.update(currentMessageId, { content: currentTurnText });
+                  }
+                }
               }
             }
 
-            if (message.serverContent?.modelTurn?.parts?.[0]?.text) {
-              const text = message.serverContent.modelTurn.parts[0].text;
-              await db.messages.add({
-                sessionId,
-                role: 'model',
-                content: text,
-                timestamp: Date.now(),
-                type: 'voice'
-              });
-              await syncToGoogleSheets(sessionId);
+            // Handle turn complete
+            if (message.serverContent?.turnComplete) {
+              if (currentMessageId !== null) {
+                await syncToGoogleSheets(sessionId);
+              }
+              currentTurnText = '';
+              currentMessageId = null;
             }
 
+            // Handle interruption
             if (message.serverContent?.interrupted) {
               audioQueueRef.current = [];
               isPlayingRef.current = false;
+              currentTurnText = '';
+              currentMessageId = null;
             }
           },
           onclose: () => {
@@ -98,6 +124,7 @@ export const VoiceAssistant: React.FC = () => {
     stopAudioCapture();
     setIsConnected(false);
     setIsConnecting(false);
+    setIsSpeaking(false);
     audioQueueRef.current = [];
     isPlayingRef.current = false;
   };
@@ -137,10 +164,12 @@ export const VoiceAssistant: React.FC = () => {
   const playNextInQueue = async () => {
     if (audioQueueRef.current.length === 0) {
       isPlayingRef.current = false;
+      setIsSpeaking(false);
       return;
     }
 
     isPlayingRef.current = true;
+    setIsSpeaking(true);
     const pcmData = audioQueueRef.current.shift()!;
     
     if (!audioContextRef.current) {
@@ -255,11 +284,13 @@ export const VoiceAssistant: React.FC = () => {
 
         <div className="text-center mb-12">
           <h3 className="text-xl font-bold text-slate-100 mb-2">
-            {isConnected ? "Aqua Quence is Listening..." : isConnecting ? "Connecting..." : "Start Voice Order"}
+            {isConnected 
+              ? (isSpeaking ? "Aqua Quence is Speaking..." : "Aqua Quence is Listening...") 
+              : isConnecting ? "Connecting..." : "Start Voice Order"}
           </h3>
           <p className="text-slate-400 text-sm max-w-xs mx-auto">
             {isConnected 
-              ? "Speak naturally to place your order. We'll handle the rest." 
+              ? (isSpeaking ? "Please wait while we respond." : "Speak naturally to place your order.") 
               : "Experience our 24/7 AI Voice Assistant for instant water jar delivery."}
           </p>
         </div>

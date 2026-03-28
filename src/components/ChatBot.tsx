@@ -55,20 +55,27 @@ export const ChatBot: React.FC = () => {
         type: 'text'
       });
 
-      // 2. Send to Gemini
-      const response = await chatRef.current.sendMessage({ message: userMessage });
-      const botMessage = response.text;
-
-      // 3. Save bot response to Dexie.js
-      await db.messages.add({
+      // 2. Send to Gemini with streaming
+      const stream = await chatRef.current.sendMessageStream({ message: userMessage });
+      
+      let fullResponse = '';
+      const messageId = await db.messages.add({
         sessionId,
         role: 'model',
-        content: botMessage,
+        content: '',
         timestamp: Date.now(),
         type: 'text'
       });
 
-      // 4. Sync to Google Sheets
+      for await (const chunk of stream) {
+        const chunkText = chunk.text;
+        fullResponse += chunkText;
+        
+        // Update the message in Dexie.js in real-time
+        await db.messages.update(messageId, { content: fullResponse });
+      }
+
+      // 3. Sync to Google Sheets after full response
       await syncToGoogleSheets(sessionId);
     } catch (error) {
       console.error("Chat error:", error);
