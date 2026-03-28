@@ -26,7 +26,7 @@ CAPABILITIES:
 `;
 
 export const getGeminiPro = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY! });
   return ai.models.generateContent({
     model: "gemini-3.1-pro-preview",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
