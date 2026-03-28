@@ -37,7 +37,7 @@ export const VoiceAssistant: React.FC = () => {
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
       
       sessionRef.current = await ai.live.connect({
-        model: "gemini-3.1-flash-live-preview",
+        model: "gemini-1.5-flash",
         config: {
           responseModalities: [Modality.AUDIO],
           systemInstruction: SYSTEM_INSTRUCTION,
