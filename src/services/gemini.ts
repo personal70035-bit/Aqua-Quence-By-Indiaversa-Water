@@ -28,7 +28,7 @@ CAPABILITIES:
 export const getGeminiPro = () => {
   const ai = new GoogleGenAI({ apiKey: "AIzaSyBUzPtI1oBJdbgpF6ZSlgDZ-akn1IKjwKE", httpOptions: { apiVersion: "v1" } });
   return ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "models/gemini-1.5-flash",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
       systemInstructions: SYSTEM_INSTRUCTION,
@@ -39,7 +39,7 @@ export const getGeminiPro = () => {
 export const createChat = () => {
   const ai = new GoogleGenAI({ apiKey: "AIzaSyBUzPtI1oBJdbgpF6ZSlgDZ-akn1IKjwKE", httpOptions: { apiVersion: "v1" } });
   return ai.chats.create({
-    model: "gemini-1.5-flash",
+    model: "models/gemini-1.5-flash",
     config: {
   systemInstructions: SYSTEM_INSTRUCTION,
 },
