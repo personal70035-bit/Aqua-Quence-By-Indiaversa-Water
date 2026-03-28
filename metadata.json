@@ -1,0 +1,5 @@
+{
+  "name": "Aqua Quence Order Management System",
+  "description": "A high-performance React application for 'Aqua Quence by Indiversa Water' featuring a Gemini Live API-powered Voice Assistant and a Gemini Pro-powered Text Chatbot for water jar orders in Maheshtala, Kolkata.",
+  "requestFramePermissions": ["microphone"]
+}
