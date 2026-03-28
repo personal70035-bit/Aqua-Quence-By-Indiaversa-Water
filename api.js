@@ -2,7 +2,7 @@ export async function callAPI() {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
-      "Authorization": "Bearer YOUR_API_KEY",
+      "Authorization": "AIzaSyBUzPtI1oBJdbgpF6ZSlgDZ-akn1IKjwKE",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
