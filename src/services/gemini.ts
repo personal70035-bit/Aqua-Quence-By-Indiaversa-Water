@@ -26,23 +26,24 @@ CAPABILITIES:
 `;
 
 export const getGeminiPro = () => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY, httpOptions: { apiVersion: "v1" } });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || "", httpOptions: { apiVersion: "v1" } });
   return ai.models.generateContent({
     model: "gemini-1.5-flash",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstructions
     },
   });
 };
 
 export const createChat = () => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY, httpOptions: { apiVersion: "v1" } });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || "", httpOptions: { apiVersion: "v1" } });
   return ai.chats.create({
     model: "gemini-1.5-flash",
     config: {
-      systemInstruction: SYSTEM_INSTRUCTION,
-    },
+    config: {
+  systemInstructions: SYSTEM_INSTRUCTION,
+},
   });
 };
 
