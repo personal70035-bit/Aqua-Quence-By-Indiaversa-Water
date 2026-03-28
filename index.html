@@ -1,9 +1,24 @@
+<!DOCTYPE html>
+<html>
+<body>
+
 <script>
-fetch("https://aquaquence-by-indiversawater.personal-70035.workers.dev/")
-  .then(res => res.json())
-  .then(data => {
-    console.log(data);
-    document.body.innerHTML += "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+fetch("https://aquaquece-by-indiverswater.personal.70815.workers.dev/")
+  .then(async res => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(text);
+    }
   })
-  .catch(err => console.error(err));
+  .then(data => {
+    document.body.innerHTML = "<pre>" + JSON.stringify(data, null, 2) + "</pre>";
+  })
+  .catch(err => {
+    document.body.innerHTML = "<pre style='color:red'>" + err + "</pre>";
+  });
 </script>
+
+</body>
+</html>
