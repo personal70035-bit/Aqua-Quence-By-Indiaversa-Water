@@ -31,7 +31,7 @@ export const getGeminiPro = () => {
     model: "gemini-1.5-flash",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
-      systemInstructions
+      systemInstructions: SYSTEM_INSTRUCTION,
     },
   });
 };
@@ -40,7 +40,6 @@ export const createChat = () => {
   const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || "", httpOptions: { apiVersion: "v1" } });
   return ai.chats.create({
     model: "gemini-1.5-flash",
-    config: {
     config: {
   systemInstructions: SYSTEM_INSTRUCTION,
 },
