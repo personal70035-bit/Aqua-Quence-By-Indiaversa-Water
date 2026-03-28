@@ -26,9 +26,9 @@ CAPABILITIES:
 `;
 
 export const getGeminiPro = () => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY, httpOptions: { apiVersion: "v1" } });
   return ai.models.generateContent({
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -37,9 +37,9 @@ export const getGeminiPro = () => {
 };
 
 export const createChat = () => {
-  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY, httpOptions: { apiVersion: "v1" } });
   return ai.chats.create({
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
     },
