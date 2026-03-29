@@ -2,7 +2,7 @@ import { db } from "../db";
 
 // This is the Google Sheets Web App URL.
 // The user will need to provide this in their environment variables.
-const GOOGLE_SHEETS_WEB_APP_URL = process.env.VITE_GOOGLE_SHEETS_WEB_APP_URL || "";
+const GOOGLE_SHEETS_WEB_APP_URL = import.meta.env.VITE_GOOGLE_SHEETS_WEB_APP_URL || process.env.VITE_GOOGLE_SHEETS_WEB_APP_URL || "";
 
 export interface SyncData {
   sessionId: string;

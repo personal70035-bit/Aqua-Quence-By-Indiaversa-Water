@@ -25,8 +25,16 @@ CAPABILITIES:
 - For voice calls, keep responses concise and conversational.
 `;
 
+const getApiKey = () => {
+  return import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+};
+
 export const getGeminiPro = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not set. Please check your environment variables.");
+  }
+  const ai = new GoogleGenAI({ apiKey });
   return ai.models.generateContent({
     model: "gemini-3.1-pro-preview",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
@@ -37,7 +45,11 @@ export const getGeminiPro = () => {
 };
 
 export const createChat = () => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is not set. Please check your environment variables.");
+  }
+  const ai = new GoogleGenAI({ apiKey });
   return ai.chats.create({
     model: "gemini-3.1-pro-preview",
     config: {

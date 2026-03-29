@@ -34,7 +34,11 @@ export const VoiceAssistant: React.FC = () => {
     let currentMessageId: number | null = null;
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
+      if (!apiKey) {
+        console.error("GEMINI_API_KEY is not set. Please check your environment variables.");
+      }
+      const ai = new GoogleGenAI({ apiKey });
       
       sessionRef.current = await ai.live.connect({
         model: "gemini-3.1-flash-live-preview",
