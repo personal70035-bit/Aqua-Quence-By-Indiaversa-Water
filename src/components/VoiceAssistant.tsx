@@ -70,6 +70,23 @@ export const VoiceAssistant: React.FC = () => {
     let currentTurnText = '';
     let currentMessageId: number | null = null;
 
+    // CRITICAL: Initialize AudioContext immediately on user gesture for mobile/Samsung compatibility
+    try {
+      if (!audioContextRef.current) {
+        // Use standard sample rate first, then we'll handle resampling if needed
+        // or just use 16000 if the browser supports it. 
+        // Most modern browsers handle 16000 fine, but the key is the timing of creation.
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      }
+      
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+      console.log("AudioContext initialized/resumed successfully on user gesture");
+    } catch (e) {
+      console.error("Failed to initialize AudioContext on gesture:", e);
+    }
+
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "";
       if (!apiKey) {
@@ -188,21 +205,40 @@ export const VoiceAssistant: React.FC = () => {
     setIsSpeaking(false);
     audioQueueRef.current = [];
     isPlayingRef.current = false;
+
+    // Suspend AudioContext to release resources but don't close it
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      audioContextRef.current.suspend().catch(() => {});
+    }
   };
 
   const startAudioCapture = async () => {
     if (isClosingRef.current) return;
     
     try {
+      // AudioContext should already be initialized from startCall gesture
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      } else if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+      }
+      
+      if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
       }
 
       if (isClosingRef.current) return;
 
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Check for getUserMedia support
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Your browser does not support microphone access. Please try a modern browser like Chrome or Safari.");
+      }
+
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
       
       if (isClosingRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -334,7 +370,7 @@ export const VoiceAssistant: React.FC = () => {
     const pcmData = audioQueueRef.current.shift()!;
     
     if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     }
 
     const audioBuffer = audioContextRef.current.createBuffer(1, pcmData.length, 24000);
