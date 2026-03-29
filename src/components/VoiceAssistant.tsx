@@ -13,7 +13,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onTranscript }) => {
   // Use your environment variable for the API Key
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const genAI = new GoogleGenerativeAI(apiKey || "");
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
   const startAssistant = async () => {
     if (!apiKey) {
       setError("API Key missing! Add VITE_GEMINI_API_KEY to your settings.");
