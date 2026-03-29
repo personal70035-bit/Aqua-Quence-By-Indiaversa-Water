@@ -40,6 +40,7 @@ export const VoiceAssistant: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<Int16Array[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
   const isPlayingRef = useRef(false);
   const isConnectedRef = useRef(false);
   const isClosingRef = useRef(false);
@@ -73,14 +74,9 @@ export const VoiceAssistant: React.FC = () => {
     // CRITICAL: Initialize AudioContext immediately on user gesture for mobile/Samsung compatibility
     try {
       if (!audioContextRef.current) {
-        // Try to create with 16000, but some Samsung devices might reject it
-        // We'll handle resampling if it ends up with a different rate
-        try {
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        } catch (e) {
-          console.warn("Failed to create AudioContext with 16000Hz, falling back to default rate");
-          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
+        // ALWAYS use default rate first on mobile/Samsung to avoid hardware rejection
+        // We will resample everything to 16000 for the AI
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
       }
       
       if (audioContextRef.current.state === 'suspended') {
@@ -194,7 +190,7 @@ export const VoiceAssistant: React.FC = () => {
       let errorMessage = "Failed to connect to voice assistant.";
       
       if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
-        errorMessage = "Microphone access was denied. On Samsung devices, please check: \n1. Site Settings in your browser\n2. Phone Settings > Apps > [Browser] > Permissions\n3. Ensure no other app is using the microphone.";
+        errorMessage = "Microphone access was denied. On Samsung devices, please check: \n1. Site Settings in your browser\n2. Phone Settings > Apps > [Browser] > Permissions\n3. Phone Settings > Security & Privacy > Privacy > Microphone Access (MUST BE ON)\n4. Ensure no other app is using the microphone.";
       } else if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
         errorMessage = "Aqua Quence is currently handling too many voice calls (Quota Exceeded). Please wait about 60 seconds and try again.";
       } else if (error?.message?.includes("leaked") || error?.message?.includes("403") || error?.status === 403) {
@@ -290,9 +286,20 @@ export const VoiceAssistant: React.FC = () => {
         
         workletNode.port.onmessage = (event) => {
           // Strict state checks to prevent sending data to a closed/closing socket
-          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
+          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) {
+            setMicLevel(0);
+            return;
+          }
           
           let inputData = event.data;
+          
+          // Calculate mic level for visual feedback
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+          }
+          const rms = Math.sqrt(sum / inputData.length);
+          setMicLevel(Math.min(100, rms * 500));
           
           // Resample to 16000 if needed
           if (audioContextRef.current && audioContextRef.current.sampleRate !== 16000) {
@@ -333,8 +340,19 @@ export const VoiceAssistant: React.FC = () => {
         // Fallback to ScriptProcessor if AudioWorklet is not supported (unlikely in modern browsers)
         const scriptNode = audioContextRef.current.createScriptProcessor(4096, 1, 1);
         scriptNode.onaudioprocess = (e) => {
-          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
+          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) {
+            setMicLevel(0);
+            return;
+          }
           let inputData = e.inputBuffer.getChannelData(0);
+          
+          // Calculate mic level for visual feedback
+          let sum = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            sum += inputData[i] * inputData[i];
+          }
+          const rms = Math.sqrt(sum / inputData.length);
+          setMicLevel(Math.min(100, rms * 500));
           
           // Resample to 16000 if needed
           if (audioContextRef.current && audioContextRef.current.sampleRate !== 16000) {
@@ -368,6 +386,7 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   const stopAudioCapture = () => {
+    setMicLevel(0);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -488,16 +507,32 @@ export const VoiceAssistant: React.FC = () => {
           <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
           <h2 className="text-slate-200 font-semibold">Aqua Quence Voice</h2>
         </div>
-        {isConnected && (
-          <button
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-2 rounded-lg transition-colors ${
-              isMuted ? 'text-rose-400 bg-rose-400/10' : 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10'
-            }`}
-          >
-            {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {isConnected && !isMuted && (
+            <div className="flex gap-0.5 items-end h-4 w-12">
+              {[...Array(5)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    height: isSpeaking ? [4, 16, 4] : [4, Math.max(4, micLevel * (0.5 + Math.random())), 4] 
+                  }}
+                  transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
+                  className="w-1 bg-indigo-400 rounded-full"
+                />
+              ))}
+            </div>
+          )}
+          {isConnected && (
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className={`p-2 rounded-lg transition-colors ${
+                isMuted ? 'text-rose-400 bg-rose-400/10' : 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10'
+              }`}
+            >
+              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
