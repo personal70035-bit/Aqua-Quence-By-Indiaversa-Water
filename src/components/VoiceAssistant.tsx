@@ -10,16 +10,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onTranscript }) => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use your environment variable for the API Key
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   const genAI = new GoogleGenerativeAI(apiKey || "");
 
-  // ✅ BABY STEP 1: Updated model name to gemini-1.5-flash-latest
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+  // ✅ FINAL FIX 1: Upgraded to gemini-2.0-flash for the new SDK
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const startAssistant = async () => {
     if (!apiKey) {
-      setError("API Key missing! Add VITE_GEMINI_API_KEY to your settings.");
+      setError("API Key missing! Check Cloudflare Environment Variables.");
       return;
     }
 
@@ -27,21 +26,26 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onTranscript }) => {
     setError(null);
 
     try {
-      // ✅ BABY STEP 2: Removed the 'generationConfig' wrapper to stop the warning
-      // We now pass temperature and topP directly in the chat options
+      // ✅ FINAL FIX 2: Correctly formatted config to stop the warning
       const chat = model.startChat({
         history: [],
-        temperature: 1,
-        topP: 0.95,
-        maxOutputTokens: 1000,
+        generationConfig: {
+          temperature: 1,
+          topP: 0.95,
+          maxOutputTokens: 1000,
+        }
       });
 
       console.log("Assistant Connected!");
       setIsListening(true);
       
+      // ✅ Test Message to prove it works
+      const result = await chat.sendMessage("Hello! Are you there?");
+      console.log("Gemini says:", result.response.text());
+
     } catch (err: any) {
       console.error("Connection failed:", err);
-      setError("Could not reach Gemini. Check your internet or API key.");
+      setError("Could not reach Gemini. Check console for details.");
     } finally {
       setIsConnecting(false);
     } 
