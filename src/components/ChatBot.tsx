@@ -1,154 +1,95 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Bot, Send, Trash2, Search, BrainCircuit, Zap } from 'lucide-react';
 import { db } from '../db';
-import { createChat } from '../services/gemini';
-import { syncToGoogleSheets } from '../services/googleSheets';
-import { v4 as uuidv4 } from 'uuid';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { createChat, MODELS } from '../services/gemini';
 
 export const ChatBot: React.FC = () => {
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>(() => {
-    const saved = localStorage.getItem('aqua_quence_session_id');
-    if (saved) return saved;
-    const newId = uuidv4();
-    localStorage.setItem('aqua_quence_session_id', newId);
-    return newId;
-  });
-
-  const messages = useLiveQuery(
-    () => db.messages.where('sessionId').equals(sessionId).sortBy('timestamp'),
-    [sessionId]
-  );
-
+  const [model, setModel] = useState(MODELS.CHAT_GENERAL);
+  const [search, setSearch] = useState(false);
   const chatRef = useRef<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messages = useLiveQuery(() => db.messages.where('mode').equals('chat').sortBy('timestamp'));
 
   useEffect(() => {
-    if (!chatRef.current) {
-      chatRef.current = createChat();
-    }
-  }, []);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    chatRef.current = createChat(model);
+  }, [model]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
+    if (!input.trim()) return;
+    const userMsg = input;
     setInput('');
-    setIsLoading(true);
-
     try {
       await db.messages.add({
-        sessionId,
+        sessionId: 'default',
+        mode: 'chat',
         role: 'user',
-        content: userMessage,
+        content: userMsg,
         timestamp: Date.now(),
         type: 'text'
       });
 
-      const stream = await chatRef.current.sendMessageStream({ message: userMessage });
-      
-      let fullResponse = '';
-      const messageId = await db.messages.add({
-        sessionId,
-        role: 'model',
-        content: '',
-        timestamp: Date.now(),
-        type: 'text'
-      });
-
-      for await (const chunk of stream) {
-        const chunkText = chunk.text;
-        fullResponse += chunkText;
-        await db.messages.update(messageId, { content: fullResponse });
+      if (!chatRef.current) {
+        chatRef.current = createChat(model);
       }
-
-      await syncToGoogleSheets(sessionId);
-    } catch (error: any) {
-      console.error("Chat error:", error);
-      let errorMessage = "Sorry, something went wrong. Please try again.";
       
-      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
-        errorMessage = "Aqua Quence is currently handling too many requests (Quota Exceeded). Please wait about 60 seconds and try again.";
-      }
-
+      const response = await chatRef.current.sendMessage({ message: userMsg });
+      
       await db.messages.add({
-        sessionId,
+        sessionId: 'default',
+        mode: 'chat',
         role: 'model',
-        content: errorMessage,
+        content: response.text || "",
         timestamp: Date.now(),
         type: 'text'
       });
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error("Chat error:", error);
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      await db.messages.where('mode').equals('chat').delete();
+      chatRef.current = createChat(model);
+    } catch (error) {
+      console.error("Failed to clear chat:", error);
     }
   };
 
   return (
-    <div className="flex flex-col h-full w-full max-w-2xl mx-auto overflow-hidden">
-      {/* Transcript Flow */}
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto px-6 py-8 space-y-6 no-scrollbar"
-      >
-        <AnimatePresence initial={false}>
-          {messages?.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col"
-            >
-              <span className={`text-[9px] font-black uppercase tracking-[0.3em] mb-2 font-display ${
-                msg.role === 'user' ? 'text-metallic-silver/60' : 'text-aqua-cyan/60'
-              }`}>
-                {msg.role === 'user' ? 'Client_Input' : 'System_Response'}
-              </span>
-              <div className={`glass-panel p-5 silver-border ${
-                msg.role === 'user' ? 'bg-white/2' : 'bg-aqua-cyan/5'
-              }`}>
-                <p className={`text-[12px] leading-relaxed ${
-                  msg.role === 'user' ? 'text-silver-light/80' : 'text-silver-light font-medium'
-                }`}>
-                  {msg.content}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-3"
-          >
-            <div className="w-1.5 h-1.5 bg-aqua-cyan rounded-full animate-pulse shadow-[0_0_10px_rgba(0,245,255,0.5)]" />
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-aqua-cyan font-display">Processing_Intel</span>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Industrial Input */}
-      <div className="px-6 pb-32">
-        <div className="relative flex items-center">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="ENTER COMMAND..."
-            className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-[12px] text-white placeholder:text-white/10 focus:outline-none focus:border-aqua-cyan/30 transition-all font-display uppercase tracking-[0.3em]"
-          />
+    <div className="flex flex-col h-[calc(100vh-200px)] w-full max-w-2xl mx-auto glass-panel overflow-hidden border border-white/10 p-6 rounded-3xl">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Bot className="text-blue-500" size={24} />
+          <h2 className="text-xl font-semibold text-white">Aqua Chat</h2>
         </div>
+        <div className="flex items-center gap-2">
+            <button onClick={() => setModel(model === MODELS.CHAT_COMPLEX ? MODELS.CHAT_GENERAL : MODELS.CHAT_COMPLEX)} className={`p-2 rounded-full ${model === MODELS.CHAT_COMPLEX ? 'bg-blue-600' : 'border border-white/10'}`} title="High Thinking"><BrainCircuit size={16} /></button>
+            <button onClick={() => setModel(model === MODELS.CHAT_FAST ? MODELS.CHAT_GENERAL : MODELS.CHAT_FAST)} className={`p-2 rounded-full ${model === MODELS.CHAT_FAST ? 'bg-blue-600' : 'border border-white/10'}`} title="Fast Response"><Zap size={16} /></button>
+            <button onClick={() => setSearch(!search)} className={`p-2 rounded-full ${search ? 'bg-blue-600' : 'border border-white/10'}`} title="Search Grounding"><Search size={16} /></button>
+            <button onClick={clearChat} className="p-2 rounded-full border border-white/10 text-white/40 hover:text-white"><Trash2 size={16} /></button>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-4">
+        {messages?.map((msg, i) => (
+          <div key={i} className={`p-4 rounded-2xl ${msg.role === 'user' ? 'bg-blue-600 self-end' : 'bg-white/10 self-start'}`}>
+            <p className="text-white">{msg.content}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 flex gap-4">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask Aqua Quence..."
+          className="flex-1 bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white placeholder:text-white/30 focus:outline-none"
+        />
+        <button onClick={handleSend} className="bg-blue-600 text-white p-4 rounded-2xl">
+          <Send size={20} />
+        </button>
       </div>
     </div>
   );
 };
-;

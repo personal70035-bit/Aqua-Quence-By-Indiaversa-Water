@@ -1,33 +1,37 @@
-import Dexie, { type EntityTable } from 'dexie';
+import Dexie, { Table } from 'dexie';
 
 export interface Message {
   id?: number;
   sessionId: string;
+  mode: 'voice' | 'chat';
   role: 'user' | 'model';
   content: string;
   timestamp: number;
-  type: 'text' | 'voice';
-  mediaUrl?: string;
-  mediaType?: string;
+  type: 'text' | 'audio';
 }
 
-export interface Session {
-  id: string;
-  startTime: number;
-  lastUpdateTime: number;
-  transcript: string;
-  status: 'active' | 'completed';
+export interface Media {
+  id?: number;
+  sessionId: string;
+  type: string;
+  timestamp: number;
 }
 
-const db = new Dexie('AquaQuenceDB') as Dexie & {
-  messages: EntityTable<Message, 'id'>;
-  sessions: EntityTable<Session, 'id'>;
-};
+export class AquaQuenceDB extends Dexie {
+  messages!: Table<Message>;
+  media!: Table<Media>;
 
-// Schema definition
-db.version(1).stores({
-  messages: '++id, sessionId, timestamp, type',
-  sessions: 'id, startTime, lastUpdateTime, status'
-});
+  constructor() {
+    super('AquaQuenceDB');
+    this.version(1).stores({
+      messages: '++id, sessionId, role, timestamp',
+      media: '++id, sessionId, type, timestamp'
+    });
+    this.version(2).stores({
+      messages: '++id, sessionId, mode, role, timestamp',
+      media: '++id, sessionId, type, timestamp'
+    });
+  }
+}
 
-export { db };
+export const db = new AquaQuenceDB();

@@ -10,7 +10,7 @@ export interface SyncData {
   transcript: string;
   lastMessage: string;
   status: string;
-  type: 'text' | 'voice';
+  type: 'text' | 'voice' | 'audio';
 }
 
 /**
