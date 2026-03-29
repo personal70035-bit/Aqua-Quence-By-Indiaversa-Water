@@ -27,8 +27,14 @@ export const VoiceAssistant: React.FC = () => {
   const audioQueueRef = useRef<Int16Array[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isPlayingRef = useRef(false);
+  const isConnectedRef = useRef(false);
+
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
 
   const startCall = async () => {
+    if (isConnected || isConnecting) return;
     setIsConnecting(true);
     let currentTurnText = '';
     let currentMessageId: number | null = null;
@@ -128,6 +134,7 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   const stopCall = () => {
+    stopAudioCapture();
     if (sessionRef.current) {
       try {
         sessionRef.current.close();
@@ -136,7 +143,6 @@ export const VoiceAssistant: React.FC = () => {
       }
       sessionRef.current = null;
     }
-    stopAudioCapture();
     setIsConnected(false);
     setIsConnecting(false);
     setIsSpeaking(false);
@@ -152,18 +158,21 @@ export const VoiceAssistant: React.FC = () => {
       processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
       processorRef.current.onaudioprocess = (e) => {
-        if (isMuted || !sessionRef.current) return;
+        if (isMuted || !sessionRef.current || !isConnectedRef.current) return;
         
         const inputData = e.inputBuffer.getChannelData(0);
         const pcmData = floatTo16BitPCM(inputData);
         const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
         
         try {
-          sessionRef.current?.sendRealtimeInput({
-            audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-          });
+          // Check if session is still active before sending
+          if (sessionRef.current) {
+            sessionRef.current.sendRealtimeInput({
+              audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+            });
+          }
         } catch (err) {
-          console.warn("Failed to send audio data (connection might be closed):", err);
+          // Silently catch WebSocket errors during closing
         }
       };
 
