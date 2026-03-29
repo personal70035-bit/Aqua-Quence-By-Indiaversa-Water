@@ -161,8 +161,8 @@ export const VoiceAssistant: React.FC = () => {
       setIsConnecting(false);
       
       let errorMessage = "Failed to connect to voice assistant.";
-      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
-        errorMessage = "Aqua Quence is currently handling too many voice calls. Please try again in a few seconds.";
+      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        errorMessage = "Aqua Quence is currently handling too many voice calls (Quota Exceeded). Please wait about 60 seconds and try again.";
       }
       
       alert(errorMessage);
@@ -204,8 +204,13 @@ export const VoiceAssistant: React.FC = () => {
       const url = URL.createObjectURL(blob);
       
       try {
+        if (!audioContextRef.current.audioWorklet) {
+          throw new Error("AudioWorklet not supported in this browser");
+        }
+        
         await audioContextRef.current.audioWorklet.addModule(url);
         URL.revokeObjectURL(url);
+        console.log("AudioWorklet loaded successfully");
         
         const workletNode = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
         
@@ -218,9 +223,12 @@ export const VoiceAssistant: React.FC = () => {
           const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
           
           try {
+            // Double check session state before sending
             if (sessionRef.current && isSessionActiveRef.current && !isClosingRef.current) {
               sessionRef.current.sendRealtimeInput({
                 audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+              }).catch(() => {
+                // Silently handle any send errors during transition
               });
             }
           } catch (err) {
@@ -232,7 +240,7 @@ export const VoiceAssistant: React.FC = () => {
         workletNode.connect(audioContextRef.current.destination);
         processorRef.current = workletNode;
       } catch (workletError) {
-        console.error("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
+        console.warn("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
         // Fallback to ScriptProcessor if AudioWorklet is not supported (unlikely in modern browsers)
         const scriptNode = audioContextRef.current.createScriptProcessor(4096, 1, 1);
         scriptNode.onaudioprocess = (e) => {
@@ -244,7 +252,7 @@ export const VoiceAssistant: React.FC = () => {
             if (sessionRef.current && isSessionActiveRef.current && !isClosingRef.current) {
               sessionRef.current.sendRealtimeInput({
                 audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-              });
+              }).catch(() => {});
             }
           } catch (err) {}
         };

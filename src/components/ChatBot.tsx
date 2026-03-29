@@ -81,8 +81,8 @@ export const ChatBot: React.FC = () => {
       console.error("Chat error:", error);
       let errorMessage = "Sorry, something went wrong. Please try again.";
       
-      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
-        errorMessage = "Aqua Quence is currently handling too many requests. Please wait a few seconds and try again.";
+      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+        errorMessage = "Aqua Quence is currently handling too many requests (Quota Exceeded). Please wait about 60 seconds and try again.";
       }
 
       await db.messages.add({
