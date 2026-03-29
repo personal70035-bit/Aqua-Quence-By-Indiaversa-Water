@@ -7,6 +7,20 @@ import { syncToGoogleSheets } from '../services/googleSheets';
 import { v4 as uuidv4 } from 'uuid';
 import { SYSTEM_INSTRUCTION } from '../services/gemini';
 
+const WORKLET_CODE = `
+class PCMProcessor extends AudioWorkletProcessor {
+  process(inputs) {
+    const input = inputs[0];
+    if (input && input.length > 0 && input[0]) {
+      // Send the first channel data to the main thread
+      this.port.postMessage(input[0]);
+    }
+    return true;
+  }
+}
+registerProcessor('pcm-processor', PCMProcessor);
+`;
+
 export const VoiceAssistant: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -21,7 +35,7 @@ export const VoiceAssistant: React.FC = () => {
 
   const sessionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const processorRef = useRef<any>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioQueueRef = useRef<Int16Array[]>([]);
@@ -29,10 +43,25 @@ export const VoiceAssistant: React.FC = () => {
   const isPlayingRef = useRef(false);
   const isConnectedRef = useRef(false);
   const isClosingRef = useRef(false);
+  const isSessionActiveRef = useRef(false);
 
   useEffect(() => {
     isConnectedRef.current = isConnected;
   }, [isConnected]);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      isClosingRef.current = true;
+      isSessionActiveRef.current = false;
+      stopAudioCapture();
+      if (sessionRef.current) {
+        try {
+          sessionRef.current.close();
+        } catch (e) {}
+      }
+    };
+  }, []);
 
   const startCall = async () => {
     if (isConnected || isConnecting) return;
@@ -59,11 +88,13 @@ export const VoiceAssistant: React.FC = () => {
         },
         callbacks: {
           onopen: () => {
+            isSessionActiveRef.current = true;
             setIsConnected(true);
             setIsConnecting(false);
             startAudioCapture();
           },
           onmessage: async (message: LiveServerMessage) => {
+            if (isClosingRef.current || !isSessionActiveRef.current) return;
             // Handle audio output
             if (message.serverContent?.modelTurn?.parts) {
               for (const part of message.serverContent.modelTurn.parts) {
@@ -114,15 +145,18 @@ export const VoiceAssistant: React.FC = () => {
             }
           },
           onclose: () => {
+            isSessionActiveRef.current = false;
             stopCall();
           },
           onerror: (error) => {
             console.error("Live API Error:", error);
+            isSessionActiveRef.current = false;
             stopCall();
           }
         }
       });
     } catch (error: any) {
+      isSessionActiveRef.current = false;
       console.error("Failed to start call:", error);
       setIsConnecting(false);
       
@@ -137,6 +171,7 @@ export const VoiceAssistant: React.FC = () => {
 
   const stopCall = () => {
     isClosingRef.current = true;
+    isSessionActiveRef.current = false;
     stopAudioCapture();
     if (sessionRef.current) {
       try {
@@ -155,32 +190,68 @@ export const VoiceAssistant: React.FC = () => {
 
   const startAudioCapture = async () => {
     try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+      } else if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
       streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
       sourceRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current);
-      processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-
-      processorRef.current.onaudioprocess = (e) => {
-        if (isMuted || !sessionRef.current || !isConnectedRef.current || isClosingRef.current) return;
+      
+      // Use AudioWorklet instead of ScriptProcessor to avoid deprecation warnings and improve performance
+      const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      
+      try {
+        await audioContextRef.current.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
         
-        const inputData = e.inputBuffer.getChannelData(0);
-        const pcmData = floatTo16BitPCM(inputData);
-        const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
+        const workletNode = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
         
-        try {
-          // Check if session is still active before sending
-          if (sessionRef.current) {
-            sessionRef.current.sendRealtimeInput({
-              audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-            });
+        workletNode.port.onmessage = (event) => {
+          // Strict state checks to prevent sending data to a closed/closing socket
+          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
+          
+          const inputData = event.data;
+          const pcmData = floatTo16BitPCM(inputData);
+          const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
+          
+          try {
+            if (sessionRef.current && isSessionActiveRef.current && !isClosingRef.current) {
+              sessionRef.current.sendRealtimeInput({
+                audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+              });
+            }
+          } catch (err) {
+            // Silently catch WebSocket errors during closing transitions
           }
-        } catch (err) {
-          // Silently catch WebSocket errors during closing
-        }
-      };
+        };
 
-      sourceRef.current.connect(processorRef.current);
-      processorRef.current.connect(audioContextRef.current.destination);
+        sourceRef.current.connect(workletNode);
+        workletNode.connect(audioContextRef.current.destination);
+        processorRef.current = workletNode;
+      } catch (workletError) {
+        console.error("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
+        // Fallback to ScriptProcessor if AudioWorklet is not supported (unlikely in modern browsers)
+        const scriptNode = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+        scriptNode.onaudioprocess = (e) => {
+          if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcmData = floatTo16BitPCM(inputData);
+          const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
+          try {
+            if (sessionRef.current && isSessionActiveRef.current && !isClosingRef.current) {
+              sessionRef.current.sendRealtimeInput({
+                audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+              });
+            }
+          } catch (err) {}
+        };
+        sourceRef.current.connect(scriptNode);
+        scriptNode.connect(audioContextRef.current.destination);
+        processorRef.current = scriptNode;
+      }
     } catch (error) {
       console.error("Error capturing audio:", error);
     }
@@ -192,7 +263,11 @@ export const VoiceAssistant: React.FC = () => {
       streamRef.current = null;
     }
     if (processorRef.current) {
-      processorRef.current.onaudioprocess = null;
+      if (processorRef.current instanceof AudioWorkletNode) {
+        processorRef.current.port.onmessage = null;
+      } else {
+        processorRef.current.onaudioprocess = null;
+      }
       processorRef.current.disconnect();
       processorRef.current = null;
     }
@@ -200,9 +275,10 @@ export const VoiceAssistant: React.FC = () => {
       sourceRef.current.disconnect();
       sourceRef.current = null;
     }
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(console.error);
-      audioContextRef.current = null;
+    // Don't close AudioContext here as it might be needed for playback
+    // Instead, just suspend it to save resources
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      audioContextRef.current.suspend().catch(console.error);
     }
   };
 
