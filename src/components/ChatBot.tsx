@@ -83,6 +83,8 @@ export const ChatBot: React.FC = () => {
       
       if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
         errorMessage = "Aqua Quence is currently handling too many requests (Quota Exceeded). Please wait about 60 seconds and try again.";
+      } else if (error?.message?.includes("leaked") || error?.message?.includes("403") || error?.status === 403) {
+        errorMessage = "Your Gemini API key has been reported as leaked and disabled. Please go to the AI Studio Settings (top right) and provide a fresh API key to continue.";
       }
 
       await db.messages.add({
