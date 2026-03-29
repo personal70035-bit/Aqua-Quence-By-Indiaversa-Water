@@ -73,16 +73,30 @@ export const VoiceAssistant: React.FC = () => {
     // CRITICAL: Initialize AudioContext immediately on user gesture for mobile/Samsung compatibility
     try {
       if (!audioContextRef.current) {
-        // Use standard sample rate first, then we'll handle resampling if needed
-        // or just use 16000 if the browser supports it. 
-        // Most modern browsers handle 16000 fine, but the key is the timing of creation.
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        // Try to create with 16000, but some Samsung devices might reject it
+        // We'll handle resampling if it ends up with a different rate
+        try {
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
+        } catch (e) {
+          console.warn("Failed to create AudioContext with 16000Hz, falling back to default rate");
+          audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
       }
       
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
       }
-      console.log("AudioContext initialized/resumed successfully on user gesture");
+
+      // Play a tiny silent sound to "warm up" the context on mobile/Samsung
+      const oscillator = audioContextRef.current.createOscillator();
+      const gainNode = audioContextRef.current.createGain();
+      gainNode.gain.value = 0;
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
+      oscillator.start(0);
+      oscillator.stop(0.1);
+      
+      console.log("AudioContext initialized/resumed successfully. Sample rate:", audioContextRef.current.sampleRate);
     } catch (e) {
       console.error("Failed to initialize AudioContext on gesture:", e);
     }
@@ -178,7 +192,10 @@ export const VoiceAssistant: React.FC = () => {
       setIsConnecting(false);
       
       let errorMessage = "Failed to connect to voice assistant.";
-      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
+      
+      if (error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError') {
+        errorMessage = "Microphone access was denied. On Samsung devices, please check: \n1. Site Settings in your browser\n2. Phone Settings > Apps > [Browser] > Permissions\n3. Ensure no other app is using the microphone.";
+      } else if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
         errorMessage = "Aqua Quence is currently handling too many voice calls (Quota Exceeded). Please wait about 60 seconds and try again.";
       } else if (error?.message?.includes("leaked") || error?.message?.includes("403") || error?.status === 403) {
         errorMessage = "Your Gemini API key has been reported as leaked and disabled. Please go to the AI Studio Settings (top right) and provide a fresh API key to continue.";
@@ -229,16 +246,21 @@ export const VoiceAssistant: React.FC = () => {
 
       // Check for getUserMedia support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Your browser does not support microphone access. Please try a modern browser like Chrome or Safari.");
+        throw new Error("Your browser does not support microphone access. Please try a modern browser like Chrome or Samsung Internet.");
       }
 
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
+      try {
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
+      } catch (err) {
+        console.warn("Failed to get audio with constraints, falling back to simple audio: true", err);
+        streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
       
       if (isClosingRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -270,7 +292,13 @@ export const VoiceAssistant: React.FC = () => {
           // Strict state checks to prevent sending data to a closed/closing socket
           if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
           
-          const inputData = event.data;
+          let inputData = event.data;
+          
+          // Resample to 16000 if needed
+          if (audioContextRef.current && audioContextRef.current.sampleRate !== 16000) {
+            inputData = resample(inputData, audioContextRef.current.sampleRate, 16000);
+          }
+          
           const pcmData = floatTo16BitPCM(inputData);
           const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
           
@@ -306,7 +334,13 @@ export const VoiceAssistant: React.FC = () => {
         const scriptNode = audioContextRef.current.createScriptProcessor(4096, 1, 1);
         scriptNode.onaudioprocess = (e) => {
           if (isMuted || !sessionRef.current || !isSessionActiveRef.current || isClosingRef.current) return;
-          const inputData = e.inputBuffer.getChannelData(0);
+          let inputData = e.inputBuffer.getChannelData(0);
+          
+          // Resample to 16000 if needed
+          if (audioContextRef.current && audioContextRef.current.sampleRate !== 16000) {
+            inputData = resample(inputData, audioContextRef.current.sampleRate, 16000);
+          }
+          
           const pcmData = floatTo16BitPCM(inputData);
           const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
           try {
@@ -411,6 +445,24 @@ export const VoiceAssistant: React.FC = () => {
       buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
     }
     return buffer;
+  };
+
+  const resample = (data: Float32Array, fromRate: number, toRate: number) => {
+    if (Math.abs(fromRate - toRate) < 1) return data;
+    const ratio = fromRate / toRate;
+    const newLength = Math.round(data.length / ratio);
+    const result = new Float32Array(newLength);
+    for (let i = 0; i < newLength; i++) {
+      const pos = i * ratio;
+      const index = Math.floor(pos);
+      const frac = pos - index;
+      if (index + 1 < data.length) {
+        result[i] = data[index] * (1 - frac) + data[index + 1] * frac;
+      } else {
+        result[i] = data[index];
+      }
+    }
+    return result;
   };
 
   return (
