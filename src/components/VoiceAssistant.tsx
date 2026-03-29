@@ -189,6 +189,8 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   const startAudioCapture = async () => {
+    if (isClosingRef.current) return;
+    
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new AudioContext({ sampleRate: 16000 });
@@ -196,20 +198,30 @@ export const VoiceAssistant: React.FC = () => {
         await audioContextRef.current.resume();
       }
 
+      if (isClosingRef.current) return;
+
       streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      if (isClosingRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+        return;
+      }
+
       sourceRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current);
       
       // Use AudioWorklet instead of ScriptProcessor to avoid deprecation warnings and improve performance
-      const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
-      const url = URL.createObjectURL(blob);
+      const workletUrl = `data:application/javascript;base64,${btoa(WORKLET_CODE)}`;
       
       try {
         if (!audioContextRef.current.audioWorklet) {
           throw new Error("AudioWorklet not supported in this browser");
         }
         
-        await audioContextRef.current.audioWorklet.addModule(url);
-        URL.revokeObjectURL(url);
+        await audioContextRef.current.audioWorklet.addModule(workletUrl);
+        
+        if (isClosingRef.current) return;
+        
         console.log("AudioWorklet loaded successfully");
         
         const workletNode = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
@@ -236,11 +248,20 @@ export const VoiceAssistant: React.FC = () => {
           }
         };
 
+        if (isClosingRef.current) {
+          workletNode.port.onmessage = null;
+          workletNode.disconnect();
+          return;
+        }
+
         sourceRef.current.connect(workletNode);
         workletNode.connect(audioContextRef.current.destination);
         processorRef.current = workletNode;
       } catch (workletError) {
         console.warn("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
+        
+        if (isClosingRef.current) return;
+
         // Fallback to ScriptProcessor if AudioWorklet is not supported (unlikely in modern browsers)
         const scriptNode = audioContextRef.current.createScriptProcessor(4096, 1, 1);
         scriptNode.onaudioprocess = (e) => {
@@ -256,6 +277,13 @@ export const VoiceAssistant: React.FC = () => {
             }
           } catch (err) {}
         };
+        
+        if (isClosingRef.current) {
+          scriptNode.onaudioprocess = null;
+          scriptNode.disconnect();
+          return;
+        }
+
         sourceRef.current.connect(scriptNode);
         scriptNode.connect(audioContextRef.current.destination);
         processorRef.current = scriptNode;
