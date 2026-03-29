@@ -485,8 +485,8 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-700/50 overflow-hidden shadow-2xl relative">
-      {/* Background Animation */}
+    <div className="flex flex-col h-full glass-panel rounded-3xl overflow-hidden relative min-h-[600px]">
+      {/* Background Glows */}
       <AnimatePresence>
         {isConnected && (
           <motion.div
@@ -495,29 +495,28 @@ export const VoiceAssistant: React.FC = () => {
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-0 pointer-events-none"
           >
-            <div className="absolute inset-0 bg-indigo-500/10 animate-pulse" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl animate-ping opacity-30" />
+            <div className="absolute inset-0 bg-cyan-glow/5 animate-pulse" />
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50 z-10">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-500'}`} />
-          <h2 className="text-slate-200 font-semibold">Aqua Quence Voice</h2>
-        </div>
+      <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5 z-10 backdrop-blur-md">
         <div className="flex items-center gap-3">
+          <div className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-cyan-glow animate-pulse shadow-[0_0_10px_#48CAE4]' : 'bg-slate-600'}`} />
+          <h2 className="text-white font-display font-bold tracking-tight uppercase text-sm">Comm-Center Agent</h2>
+        </div>
+        <div className="flex items-center gap-4">
           {isConnected && !isMuted && (
-            <div className="flex gap-0.5 items-end h-4 w-12">
-              {[...Array(5)].map((_, i) => (
+            <div className="flex gap-1 items-end h-5 w-16">
+              {[...Array(6)].map((_, i) => (
                 <motion.div
                   key={i}
                   animate={{ 
-                    height: isSpeaking ? [4, 16, 4] : [4, Math.max(4, micLevel * (0.5 + Math.random())), 4] 
+                    height: isSpeaking ? [4, 20, 4] : [4, Math.max(4, micLevel * (0.6 + Math.random())), 4] 
                   }}
-                  transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
-                  className="w-1 bg-indigo-400 rounded-full"
+                  transition={{ repeat: Infinity, duration: 0.4, delay: i * 0.08 }}
+                  className="w-1 bg-cyan-glow rounded-full shadow-[0_0_8px_#48CAE4]"
                 />
               ))}
             </div>
@@ -525,90 +524,131 @@ export const VoiceAssistant: React.FC = () => {
           {isConnected && (
             <button
               onClick={() => setIsMuted(!isMuted)}
-              className={`p-2 rounded-lg transition-colors ${
-                isMuted ? 'text-rose-400 bg-rose-400/10' : 'text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10'
+              className={`p-2.5 rounded-xl transition-all ${
+                isMuted ? 'text-rose-400 bg-rose-400/10 border border-rose-400/20' : 'text-slate-400 hover:text-cyan-glow hover:bg-cyan-glow/10 border border-transparent'
               }`}
             >
-              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+              {isMuted ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
           )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 z-10">
-        <div className="relative mb-12">
+      {/* Main Content (Agent Focus) */}
+      <div className="flex-1 flex flex-col items-center justify-center p-12 z-10">
+        <div className="relative mb-16">
+          {/* Pulsing Orb / Liquid Waveform */}
           <motion.div
-            animate={isConnected ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ repeat: Infinity, duration: 2 }}
-            className={`w-32 h-32 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${
-              isConnected ? 'border-indigo-500 bg-indigo-500/20 shadow-[0_0_50px_rgba(99,102,241,0.3)]' : 'border-slate-700 bg-slate-800'
+            animate={isConnected ? { 
+              scale: isSpeaking ? [1, 1.15, 1] : [1, 1.05, 1],
+              boxShadow: isSpeaking 
+                ? ["0 0 40px 10px rgba(72, 202, 228, 0.2)", "0 0 80px 30px rgba(72, 202, 228, 0.4)", "0 0 40px 10px rgba(72, 202, 228, 0.2)"]
+                : ["0 0 40px 10px rgba(72, 202, 228, 0.1)", "0 0 60px 20px rgba(72, 202, 228, 0.2)", "0 0 40px 10px rgba(72, 202, 228, 0.1)"]
+            } : {}}
+            transition={{ repeat: Infinity, duration: isSpeaking ? 1.5 : 3, ease: "easeInOut" }}
+            className={`w-48 h-48 rounded-full flex items-center justify-center border-2 transition-all duration-700 relative overflow-hidden ${
+              isConnected 
+                ? 'border-cyan-glow/50 bg-cyan-glow/10' 
+                : 'border-white/10 bg-white/5'
             }`}
           >
-            {isConnected ? (
-              <Volume2 size={48} className="text-indigo-400" />
-            ) : (
-              <Phone size={48} className="text-slate-500" />
+            {/* Liquid Wave Effect inside the orb */}
+            {isConnected && (
+              <motion.div 
+                animate={{ y: isSpeaking ? [0, -10, 0] : [0, -5, 0] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                className="absolute inset-0 opacity-30 pointer-events-none"
+              >
+                <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-cyan-glow blur-2xl" />
+              </motion.div>
             )}
+            
+            <div className="relative z-10">
+              {isConnected ? (
+                <Volume2 size={64} className="text-cyan-glow drop-shadow-[0_0_15px_#48CAE4]" />
+              ) : (
+                <Phone size={64} className="text-slate-600" />
+              )}
+            </div>
           </motion.div>
           
-          {isConnected && (
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <motion.div
-                  key={i}
-                  animate={{ height: [8, 24, 8] }}
-                  transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.1 }}
-                  className="w-1 bg-indigo-400 rounded-full"
-                />
-              ))}
+          {/* External Ripple for Voice Activation Button area */}
+          {!isConnected && !isConnecting && (
+            <div className="absolute inset-0 -z-10 flex items-center justify-center">
+              <div className="w-48 h-48 rounded-full border border-cyan-glow/20 animate-[ping_3s_infinite]" />
+              <div className="absolute w-48 h-48 rounded-full border border-cyan-glow/10 animate-[ping_3s_infinite_1s]" />
             </div>
           )}
         </div>
 
-        <div className="text-center mb-12">
-          <h3 className="text-xl font-bold text-slate-100 mb-2">
+        <div className="text-center mb-16">
+          <h3 className="text-2xl font-display font-bold text-white mb-3 tracking-tight">
             {isConnected 
-              ? (isSpeaking ? "Aqua Quence is Speaking..." : "Aqua Quence is Listening...") 
-              : isConnecting ? "Connecting..." : "Start Voice Order"}
+              ? (isSpeaking ? "Agent Speaking" : "Listening...") 
+              : isConnecting ? "Establishing Link..." : "Voice Activation"}
           </h3>
-          <p className="text-slate-400 text-sm max-w-xs mx-auto">
-            {isConnected 
-              ? (isSpeaking ? "Please wait while we respond." : "Speak naturally to place your order.") 
-              : "Experience our 24/7 AI Voice Assistant for instant water jar delivery."}
-          </p>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-slate-400 text-sm max-w-xs mx-auto font-medium leading-relaxed">
+              {isConnected 
+                ? (isSpeaking ? "Aqua Quence is processing your request." : "Tell us what you need for your hydration.") 
+                : "Initiate a secure voice link to our automated supply agent."}
+            </p>
+            {isConnected && (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-glow animate-pulse" />
+                <span className="text-[10px] uppercase tracking-[0.2em] text-cyan-glow font-bold">Active Hydration</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={isConnected ? stopCall : startCall}
-          disabled={isConnecting}
-          className={`group relative flex items-center gap-3 px-8 py-4 rounded-full font-bold transition-all duration-300 transform hover:scale-105 active:scale-95 ${
-            isConnected 
-              ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20' 
-              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20'
-          }`}
-        >
-          {isConnecting ? (
-            <Loader2 size={24} className="animate-spin" />
-          ) : isConnected ? (
+        {/* Floating Voice Activation Button */}
+        <div className="ripple-container">
+          {!isConnected && !isConnecting && (
             <>
-              <PhoneOff size={24} />
-              <span>End Call</span>
-            </>
-          ) : (
-            <>
-              <Phone size={24} />
-              <span>Call Aqua Quence</span>
+              <div className="ripple" style={{ animationDuration: '3s' }} />
+              <div className="ripple" style={{ animationDuration: '3s', animationDelay: '1s' }} />
             </>
           )}
-        </button>
+          
+          <button
+            onClick={isConnected ? stopCall : startCall}
+            disabled={isConnecting}
+            className={`group relative z-10 flex items-center justify-center w-20 h-20 rounded-full transition-all duration-500 transform hover:scale-110 active:scale-95 ${
+              isConnected 
+                ? 'bg-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.4)]' 
+                : 'metallic-button !p-0 !rounded-full shadow-[0_0_30px_rgba(72,202,228,0.3)]'
+            }`}
+          >
+            {isConnecting ? (
+              <Loader2 size={32} className="animate-spin text-navy" />
+            ) : isConnected ? (
+              <PhoneOff size={32} className="text-white" />
+            ) : (
+              <Mic size={32} className="text-navy" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Status Bar */}
-      <div className="p-4 bg-slate-800/30 border-t border-slate-700/50 text-center z-10">
-        <span className="text-xs text-slate-500 uppercase tracking-widest font-semibold">
-          Powered by Gemini Live API
-        </span>
+      <div className="p-6 bg-white/5 border-t border-white/10 text-center z-10 backdrop-blur-md">
+        <div className="flex items-center justify-center gap-8">
+          <div className="flex flex-col items-center">
+            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1">Latency</span>
+            <span className="text-xs font-mono text-cyan-glow">24ms</span>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="flex flex-col items-center">
+            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1">Encryption</span>
+            <span className="text-xs font-mono text-cyan-glow">AES-256</span>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="flex flex-col items-center">
+            <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mb-1">Protocol</span>
+            <span className="text-xs font-mono text-cyan-glow">V-STREAM</span>
+          </div>
+        </div>
       </div>
     </div>
   );
