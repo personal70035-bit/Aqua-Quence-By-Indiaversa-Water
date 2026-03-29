@@ -28,6 +28,7 @@ export const VoiceAssistant: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const isPlayingRef = useRef(false);
   const isConnectedRef = useRef(false);
+  const isClosingRef = useRef(false);
 
   useEffect(() => {
     isConnectedRef.current = isConnected;
@@ -35,6 +36,7 @@ export const VoiceAssistant: React.FC = () => {
 
   const startCall = async () => {
     if (isConnected || isConnecting) return;
+    isClosingRef.current = false;
     setIsConnecting(true);
     let currentTurnText = '';
     let currentMessageId: number | null = null;
@@ -134,6 +136,7 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   const stopCall = () => {
+    isClosingRef.current = true;
     stopAudioCapture();
     if (sessionRef.current) {
       try {
@@ -158,7 +161,7 @@ export const VoiceAssistant: React.FC = () => {
       processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
       processorRef.current.onaudioprocess = (e) => {
-        if (isMuted || !sessionRef.current || !isConnectedRef.current) return;
+        if (isMuted || !sessionRef.current || !isConnectedRef.current || isClosingRef.current) return;
         
         const inputData = e.inputBuffer.getChannelData(0);
         const pcmData = floatTo16BitPCM(inputData);
@@ -189,6 +192,7 @@ export const VoiceAssistant: React.FC = () => {
       streamRef.current = null;
     }
     if (processorRef.current) {
+      processorRef.current.onaudioprocess = null;
       processorRef.current.disconnect();
       processorRef.current = null;
     }
