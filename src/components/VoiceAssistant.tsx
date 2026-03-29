@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Mic, PhoneOff, Loader2, MapPin, User } from 'lucide-react';
+import { Mic, PhoneOff, Loader2, MapPin, User, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { MODELS, SYSTEM_INSTRUCTION } from '../services/gemini';
@@ -11,11 +11,13 @@ export const VoiceAssistant: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [showDenied, setShowDenied] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const sessionRef = useRef<any>(null);
 
   const startCall = async () => {
     setIsIdle(false);
     setIsConnecting(true);
+    setErrorMsg(null);
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
       
@@ -43,12 +45,16 @@ export const VoiceAssistant: React.FC = () => {
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to start call:", error);
       setIsConnecting(false);
       setIsIdle(true);
-      setShowDenied(true);
-      setTimeout(() => setShowDenied(false), 3000);
+      if (error?.message?.includes("403") || error?.message?.includes("PERMISSION_DENIED")) {
+        setErrorMsg("API Error: The Generative Language API is disabled in your Google Cloud Project.");
+      } else {
+        setShowDenied(true);
+        setTimeout(() => setShowDenied(false), 3000);
+      }
     }
   };
 
@@ -85,6 +91,24 @@ export const VoiceAssistant: React.FC = () => {
           className="absolute top-24 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg z-20"
         >
           Call Denied
+        </motion.div>
+      )}
+      {errorMsg && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-24 bg-red-500/90 text-white px-6 py-4 rounded-2xl shadow-lg z-20 max-w-md text-center border border-red-400"
+        >
+          <p className="text-sm font-medium">{errorMsg}</p>
+          <button 
+            onClick={() => {
+              setErrorMsg(null);
+              (window as any).aistudio?.openSelectKey?.();
+            }} 
+            className="mt-3 text-xs bg-white text-red-600 hover:bg-red-50 px-4 py-2 rounded-full font-bold transition-colors"
+          >
+            Select Different API Key
+          </button>
         </motion.div>
       )}
       <div className="relative flex items-center justify-center">
@@ -135,19 +159,26 @@ export const VoiceAssistant: React.FC = () => {
         <p className="text-white/40 mt-2">Call our AI assistant to place your order for Maheshtala delivery.</p>
       </div>
 
-      <div className="flex items-center justify-center gap-12 mt-8">
+      <div className="grid grid-cols-3 gap-4 w-full max-w-4xl mt-8 px-4">
         <div className="flex flex-col items-center gap-2">
           <MapPin className="text-blue-500" size={24} />
           <div className="text-center">
             <p className="text-white font-semibold">Location</p>
-            <p className="text-white/60 text-sm">Maheshtala, Kolkata</p>
+            <p className="text-white/60 text-xs sm:text-sm">Maheshtala, Kolkata</p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center gap-2">
+          <Clock className="text-blue-500" size={24} />
+          <div className="text-center">
+            <p className="text-white font-semibold">Office Timings</p>
+            <p className="text-white/60 text-xs sm:text-sm">10:00 AM - 1:00 PM<br/>6:00 PM - 9:00 PM</p>
           </div>
         </div>
         <div className="flex flex-col items-center gap-2">
           <User className="text-blue-500" size={24} />
           <div className="text-center">
             <p className="text-white font-semibold">Owner</p>
-            <p className="text-white/60 text-sm">Anisul Alam</p>
+            <p className="text-white/60 text-xs sm:text-sm">Anisul Alam</p>
           </div>
         </div>
       </div>

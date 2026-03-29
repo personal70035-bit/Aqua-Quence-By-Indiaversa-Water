@@ -8,17 +8,20 @@ export const ChatBot: React.FC = () => {
   const [input, setInput] = useState('');
   const [model, setModel] = useState(MODELS.CHAT_GENERAL);
   const [search, setSearch] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const chatRef = useRef<any>(null);
   const messages = useLiveQuery(() => db.messages.where('mode').equals('chat').sortBy('timestamp'));
 
   useEffect(() => {
     chatRef.current = createChat(model);
+    setErrorMsg(null);
   }, [model]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     const userMsg = input;
     setInput('');
+    setErrorMsg(null);
     try {
       await db.messages.add({
         sessionId: 'default',
@@ -43,8 +46,13 @@ export const ChatBot: React.FC = () => {
         timestamp: Date.now(),
         type: 'text'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
+      if (error?.message?.includes("403") || error?.message?.includes("PERMISSION_DENIED")) {
+        setErrorMsg("API Error: The Generative Language API is disabled in your Google Cloud Project. Please enable it in the Google Cloud Console.");
+      } else {
+        setErrorMsg("An error occurred while sending the message. Please try again.");
+      }
     }
   };
 
@@ -77,6 +85,19 @@ export const ChatBot: React.FC = () => {
             <p className="text-white">{msg.content}</p>
           </div>
         ))}
+        {errorMsg && (
+          <div className="p-4 rounded-2xl bg-red-500/20 border border-red-500/50 self-start">
+            <p className="text-red-200 text-sm">{errorMsg}</p>
+            {errorMsg.includes("API Error") && (
+              <button 
+                onClick={() => (window as any).aistudio?.openSelectKey?.()} 
+                className="mt-2 text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-full transition-colors"
+              >
+                Select Different API Key
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <div className="mt-6 flex gap-4">
         <input
