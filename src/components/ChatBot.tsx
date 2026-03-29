@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Trash2, Loader2, User, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { db } from '../db';
 import { createChat } from '../services/gemini';
@@ -46,7 +45,6 @@ export const ChatBot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Save user message to Dexie.js FIRST
       await db.messages.add({
         sessionId,
         role: 'user',
@@ -55,7 +53,6 @@ export const ChatBot: React.FC = () => {
         type: 'text'
       });
 
-      // 2. Send to Gemini with streaming
       const stream = await chatRef.current.sendMessageStream({ message: userMessage });
       
       let fullResponse = '';
@@ -70,12 +67,9 @@ export const ChatBot: React.FC = () => {
       for await (const chunk of stream) {
         const chunkText = chunk.text;
         fullResponse += chunkText;
-        
-        // Update the message in Dexie.js in real-time
         await db.messages.update(messageId, { content: fullResponse });
       }
 
-      // 3. Sync to Google Sheets after full response
       await syncToGoogleSheets(sessionId);
     } catch (error: any) {
       console.error("Chat error:", error);
@@ -83,8 +77,6 @@ export const ChatBot: React.FC = () => {
       
       if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED") || error?.status === 429) {
         errorMessage = "Aqua Quence is currently handling too many requests (Quota Exceeded). Please wait about 60 seconds and try again.";
-      } else if (error?.message?.includes("leaked") || error?.message?.includes("403") || error?.status === 403) {
-        errorMessage = "Your Gemini API key has been reported as leaked and disabled. Please go to the AI Studio Settings (top right) and provide a fresh API key to continue.";
       }
 
       await db.messages.add({
@@ -99,53 +91,34 @@ export const ChatBot: React.FC = () => {
     }
   };
 
-  const clearChat = async () => {
-    if (confirm("Are you sure you want to clear the chat history for this session?")) {
-      await db.messages.where('sessionId').equals(sessionId).delete();
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full glass-panel rounded-3xl overflow-hidden relative min-h-[600px]">
-      {/* Header */}
-      <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5 z-10 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-2.5 h-2.5 bg-cyan-glow rounded-full animate-pulse shadow-[0_0_10px_#48CAE4]" />
-          <h2 className="text-white font-display font-bold tracking-tight uppercase text-sm">Hydration Chat Link</h2>
-        </div>
-        <button
-          onClick={clearChat}
-          className="p-2 text-slate-400 hover:text-rose-400 transition-colors rounded-lg hover:bg-rose-400/10"
-          title="Clear Chat History"
-        >
-          <Trash2 size={18} />
-        </button>
-      </div>
-
-      {/* Messages */}
+    <div className="flex flex-col h-full w-full max-w-2xl mx-auto overflow-hidden">
+      {/* Transcript Flow */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
+        className="flex-1 overflow-y-auto px-6 py-8 space-y-6 no-scrollbar"
       >
         <AnimatePresence initial={false}>
           {messages?.map((msg) => (
             <motion.div
               key={msg.id}
-              initial={{ opacity: 0, x: msg.role === 'user' ? 20 : -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col"
             >
-              <div className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                <div className={`p-4 text-sm leading-relaxed ${
-                  msg.role === 'user' 
-                    ? 'chat-bubble-user' 
-                    : 'chat-bubble-agent'
+              <span className={`text-[9px] font-black uppercase tracking-[0.3em] mb-2 font-display ${
+                msg.role === 'user' ? 'text-metallic-silver/60' : 'text-aqua-cyan/60'
+              }`}>
+                {msg.role === 'user' ? 'Client_Input' : 'System_Response'}
+              </span>
+              <div className={`glass-panel p-5 silver-border ${
+                msg.role === 'user' ? 'bg-white/2' : 'bg-aqua-cyan/5'
+              }`}>
+                <p className={`text-[12px] leading-relaxed ${
+                  msg.role === 'user' ? 'text-silver-light/80' : 'text-silver-light font-medium'
                 }`}>
                   {msg.content}
-                </div>
-                <span className="text-[9px] uppercase tracking-widest text-slate-500 mt-2 font-bold">
-                  {msg.role === 'user' ? 'User Client' : 'Aqua Agent'}
-                </span>
+                </p>
               </div>
             </motion.div>
           ))}
@@ -154,36 +127,28 @@ export const ChatBot: React.FC = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex justify-start"
+            className="flex items-center gap-3"
           >
-            <div className="flex gap-3 items-center bg-white/5 p-4 border border-white/10">
-              <Loader2 size={16} className="animate-spin text-cyan-glow" />
-              <span className="text-[10px] uppercase tracking-widest text-cyan-glow font-bold">Processing Intel...</span>
-            </div>
+            <div className="w-1.5 h-1.5 bg-aqua-cyan rounded-full animate-pulse shadow-[0_0_10px_rgba(0,245,255,0.5)]" />
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-aqua-cyan font-display">Processing_Intel</span>
           </motion.div>
         )}
       </div>
 
-      {/* Input */}
-      <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-md">
-        <div className="relative flex items-center gap-3">
+      {/* Industrial Input */}
+      <div className="px-6 pb-32">
+        <div className="relative flex items-center">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="ENTER COMMAND OR QUERY..."
-            className="flex-1 bg-black/40 border border-white/10 rounded-none py-4 px-6 text-white placeholder:text-slate-600 focus:outline-none focus:border-cyan-glow/50 transition-all font-mono text-xs uppercase tracking-wider"
+            placeholder="ENTER COMMAND..."
+            className="w-full bg-white/5 border border-white/10 rounded-2xl py-5 px-6 text-[12px] text-white placeholder:text-white/10 focus:outline-none focus:border-aqua-cyan/30 transition-all font-display uppercase tracking-[0.3em]"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            className="metallic-button !py-4 !px-6 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Send size={20} />
-          </button>
         </div>
       </div>
     </div>
   );
 };
+;
