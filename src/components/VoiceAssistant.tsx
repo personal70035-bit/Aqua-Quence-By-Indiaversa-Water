@@ -114,15 +114,26 @@ export const VoiceAssistant: React.FC = () => {
           }
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to start call:", error);
       setIsConnecting(false);
+      
+      let errorMessage = "Failed to connect to voice assistant.";
+      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+        errorMessage = "Aqua Quence is currently handling too many voice calls. Please try again in a few seconds.";
+      }
+      
+      alert(errorMessage);
     }
   };
 
   const stopCall = () => {
     if (sessionRef.current) {
-      sessionRef.current.close();
+      try {
+        sessionRef.current.close();
+      } catch (e) {
+        console.warn("Error closing session:", e);
+      }
       sessionRef.current = null;
     }
     stopAudioCapture();
@@ -141,14 +152,19 @@ export const VoiceAssistant: React.FC = () => {
       processorRef.current = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
       processorRef.current.onaudioprocess = (e) => {
-        if (isMuted) return;
+        if (isMuted || !sessionRef.current) return;
+        
         const inputData = e.inputBuffer.getChannelData(0);
         const pcmData = floatTo16BitPCM(inputData);
         const base64Data = uint8ArrayToBase64(new Uint8Array(pcmData.buffer));
         
-        sessionRef.current?.sendRealtimeInput({
-          audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
-        });
+        try {
+          sessionRef.current?.sendRealtimeInput({
+            audio: { data: base64Data, mimeType: 'audio/pcm;rate=16000' }
+          });
+        } catch (err) {
+          console.warn("Failed to send audio data (connection might be closed):", err);
+        }
       };
 
       sourceRef.current.connect(processorRef.current);
@@ -159,10 +175,22 @@ export const VoiceAssistant: React.FC = () => {
   };
 
   const stopAudioCapture = () => {
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    processorRef.current?.disconnect();
-    sourceRef.current?.disconnect();
-    audioContextRef.current?.close();
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (processorRef.current) {
+      processorRef.current.disconnect();
+      processorRef.current = null;
+    }
+    if (sourceRef.current) {
+      sourceRef.current.disconnect();
+      sourceRef.current = null;
+    }
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close().catch(console.error);
+      audioContextRef.current = null;
+    }
   };
 
   const playNextInQueue = async () => {

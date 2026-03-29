@@ -77,8 +77,21 @@ export const ChatBot: React.FC = () => {
 
       // 3. Sync to Google Sheets after full response
       await syncToGoogleSheets(sessionId);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat error:", error);
+      let errorMessage = "Sorry, something went wrong. Please try again.";
+      
+      if (error?.message?.includes("429") || error?.message?.includes("RESOURCE_EXHAUSTED")) {
+        errorMessage = "Aqua Quence is currently handling too many requests. Please wait a few seconds and try again.";
+      }
+
+      await db.messages.add({
+        sessionId,
+        role: 'model',
+        content: errorMessage,
+        timestamp: Date.now(),
+        type: 'text'
+      });
     } finally {
       setIsLoading(false);
     }
