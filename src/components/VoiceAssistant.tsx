@@ -211,20 +211,22 @@ export const VoiceAssistant: React.FC = () => {
       sourceRef.current = audioContextRef.current.createMediaStreamSource(streamRef.current);
       
       // Use AudioWorklet instead of ScriptProcessor to avoid deprecation warnings and improve performance
-      const workletUrl = `data:application/javascript;base64,${btoa(WORKLET_CODE)}`;
+      const blob = new Blob([WORKLET_CODE], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
       
       try {
         if (!audioContextRef.current.audioWorklet) {
           throw new Error("AudioWorklet not supported in this browser");
         }
         
-        await audioContextRef.current.audioWorklet.addModule(workletUrl);
+        await audioContextRef.current.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        console.log("AudioWorklet loaded successfully");
         
         if (isClosingRef.current) return;
         
-        console.log("AudioWorklet loaded successfully");
-        
         const workletNode = new AudioWorkletNode(audioContextRef.current, 'pcm-processor');
+        console.log("AudioWorkletNode created successfully");
         
         workletNode.port.onmessage = (event) => {
           // Strict state checks to prevent sending data to a closed/closing socket
@@ -258,7 +260,7 @@ export const VoiceAssistant: React.FC = () => {
         workletNode.connect(audioContextRef.current.destination);
         processorRef.current = workletNode;
       } catch (workletError) {
-        console.warn("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
+        console.error("AudioWorklet failed, falling back to ScriptProcessor:", workletError);
         
         if (isClosingRef.current) return;
 

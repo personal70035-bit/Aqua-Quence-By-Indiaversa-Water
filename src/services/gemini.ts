@@ -36,7 +36,7 @@ export const getGeminiPro = () => {
   }
   const ai = new GoogleGenAI({ apiKey });
   return ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3.1-flash-preview",
     contents: [{ parts: [{ text: "" }] }], // Placeholder for initial call if needed
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
@@ -51,7 +51,7 @@ export const createChat = () => {
   }
   const ai = new GoogleGenAI({ apiKey });
   return ai.chats.create({
-    model: "gemini-3.1-pro-preview",
+    model: "gemini-3.1-flash-preview",
     config: {
       systemInstruction: SYSTEM_INSTRUCTION,
     },
