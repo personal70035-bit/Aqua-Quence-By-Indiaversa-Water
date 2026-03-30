@@ -18,6 +18,7 @@ export const VoiceAssistant: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const nextPlayTimeRef = useRef<number>(0);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
 
   const startCall = async () => {
     setIsIdle(false);
@@ -46,7 +47,7 @@ export const VoiceAssistant: React.FC = () => {
           responseModalities: [Modality.AUDIO],
           systemInstruction: SYSTEM_INSTRUCTION,
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
           },
           inputAudioTranscription: {},
           outputAudioTranscription: {},
@@ -89,6 +90,15 @@ export const VoiceAssistant: React.FC = () => {
             // 5. Handle incoming audio
             if (message.serverContent?.interrupted) {
               nextPlayTimeRef.current = 0; // Reset playback queue on interruption
+              // Stop all currently playing audio sources immediately
+              activeSourcesRef.current.forEach(source => {
+                try {
+                  source.stop();
+                } catch (e) {
+                  // Ignore errors if source is already stopped
+                }
+              });
+              activeSourcesRef.current = [];
             }
             
             const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
@@ -110,6 +120,11 @@ export const VoiceAssistant: React.FC = () => {
               const source = audioContextRef.current.createBufferSource();
               source.buffer = audioBuffer;
               source.connect(audioContextRef.current.destination);
+              
+              source.onended = () => {
+                activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+              };
+              activeSourcesRef.current.push(source);
               
               const currentTime = audioContextRef.current.currentTime;
               const startTime = Math.max(currentTime, nextPlayTimeRef.current);
@@ -161,6 +176,10 @@ export const VoiceAssistant: React.FC = () => {
       streamRef.current = null;
     }
     if (audioContextRef.current) {
+      activeSourcesRef.current.forEach(source => {
+        try { source.stop(); } catch (e) {}
+      });
+      activeSourcesRef.current = [];
       audioContextRef.current.close();
       audioContextRef.current = null;
     }
