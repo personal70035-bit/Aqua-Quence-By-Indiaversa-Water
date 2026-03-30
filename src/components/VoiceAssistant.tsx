@@ -46,8 +46,10 @@ export const VoiceAssistant: React.FC = () => {
           responseModalities: [Modality.AUDIO],
           systemInstruction: SYSTEM_INSTRUCTION,
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } },
           },
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
         },
         callbacks: {
           onopen: () => {
@@ -56,7 +58,7 @@ export const VoiceAssistant: React.FC = () => {
 
             // 4. Start processing mic input and sending to Gemini
             const source = audioCtx.createMediaStreamSource(stream);
-            const processor = audioCtx.createScriptProcessor(4096, 1, 1);
+            const processor = audioCtx.createScriptProcessor(2048, 1, 1);
             processorRef.current = processor;
             
             processor.onaudioprocess = (e) => {
