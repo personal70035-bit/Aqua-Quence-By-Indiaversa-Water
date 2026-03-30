@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Droplets, Mic, MessageSquare, Clock, Info as InfoIcon, Database } from 'lucide-react';
+import { Droplets, Phone, MessageSquare, Clock, Info as InfoIcon, Database } from 'lucide-react';
 import { VoiceAssistant } from './components/VoiceAssistant';
 import { ChatBot } from './components/ChatBot';
 import { CallHistory } from './components/CallHistory';
@@ -32,7 +32,7 @@ export default function App() {
               onClick={() => setCurrentView('voice')}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg transition-all ${currentView === 'voice' ? 'bg-blue-600' : 'text-white/40'}`}
             >
-              <Mic size={16} /> <span className="hidden sm:inline">Voice</span>
+              <Phone size={16} /> <span className="hidden sm:inline">Voice</span>
             </button>
             <button
               onClick={() => setCurrentView('chat')}

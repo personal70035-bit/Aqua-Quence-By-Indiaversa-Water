@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Mic, PhoneOff, Loader2, MapPin, User, Clock } from 'lucide-react';
+import { Phone, PhoneOff, Loader2, MapPin, User, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { GoogleGenAI, Modality, LiveServerMessage } from "@google/genai";
 import { MODELS, SYSTEM_INSTRUCTION } from '../services/gemini';
@@ -206,21 +206,54 @@ export const VoiceAssistant: React.FC = () => {
           </button>
         </motion.div>
       )}
-      <div className="relative flex items-center justify-center">
+      <div className="relative flex items-center justify-center mt-12 md:mt-0">
         <button
           onClick={isIdle ? startCall : stopCall}
-          className={`w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-500 ${
+          className={`w-48 h-48 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-500 relative overflow-hidden ${
             isActive ? 'bg-red-500' : 'bg-blue-600'
           } shadow-2xl shadow-blue-500/20`}
         >
+          {isActive && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <motion.div
+                className="absolute w-full h-full bg-white/20 rounded-full"
+                animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
+              />
+              <motion.div
+                className="absolute w-full h-full bg-white/20 rounded-full"
+                animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut", delay: 0.75 }}
+              />
+            </div>
+          )}
+          
           {isConnecting ? (
-            <Loader2 className="animate-spin text-white" size={64} />
+            <Loader2 className="animate-spin text-white relative z-10" size={64} />
           ) : isEnding ? (
-            <span className="text-white font-bold tracking-widest uppercase">Call End</span>
+            <span className="text-white font-bold tracking-widest uppercase relative z-10">Call End</span>
           ) : (
             <>
-              <Mic className="text-white" size={48} />
-              <span className="text-white font-bold tracking-widest uppercase">
+              {isActive ? (
+                <div className="flex items-center justify-center gap-1.5 h-12 mb-1 relative z-10">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <motion.div
+                      key={i}
+                      className="w-1.5 bg-white rounded-full"
+                      animate={{ height: ["20%", "100%", "20%"] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 1,
+                        delay: i * 0.15,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Phone className="text-white relative z-10" size={48} />
+              )}
+              <span className="text-white font-bold tracking-widest uppercase relative z-10">
                 {isActive ? 'Live' : 'Call Aqua'}
               </span>
             </>
